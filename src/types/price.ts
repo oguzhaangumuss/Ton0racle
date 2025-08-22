@@ -1,3 +1,5 @@
+import { SourceStatus } from './oracle';
+
 export interface PriceData {
   base: string;              // Base currency (e.g., 'BTC')
   quote: string;             // Quote currency (e.g., 'USD')
@@ -103,16 +105,4 @@ export enum PriceSourceType {
   ORACLE_NETWORK = 'oracle'
 }
 
-export interface SourceStatus {
-  name: string;
-  type: PriceSourceType;
-  isOnline: boolean;
-  lastSuccessfulFetch: number;
-  errorCount: number;
-  averageResponseTime: number;
-  rateLimit: {
-    current: number;
-    limit: number;
-    resetTime: number;
-  };
-}
+// SourceStatus is now imported from ./oracle

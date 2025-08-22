@@ -36,6 +36,12 @@ export interface SourceStatus {
   lastSuccessfulFetch: number;
   errorCount: number;
   averageResponseTime: number;
+  type?: string;
+  rateLimit?: {
+    current: number;
+    limit: number;
+    resetTime: number;
+  };
 }
 
 export abstract class OracleBase<T = any> {

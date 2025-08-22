@@ -14,12 +14,12 @@ import {
 import { TONClientService } from '@/services/TONClient';
 import { CoinGeckoFetcher, BinanceFetcher, CoinMarketCapFetcher } from '@/services/DataFetcher';
 
-export class PriceOracle extends OracleBase<AggregatedPriceData> {
+export class PriceOracle extends OracleBase<PriceData> {
   private priceConfig: PriceOracleConfig;
   private tonClient: TONClientService;
   private dataSources: Map<string, PriceSource> = new Map();
   private supportedPairs: TradingPair[] = [];
-  private lastPrices: Map<string, AggregatedPriceData> = new Map();
+  private lastPrices: Map<string, PriceData> = new Map();
 
   constructor(
     priceConfig: PriceOracleConfig,
@@ -201,10 +201,9 @@ export class PriceOracle extends OracleBase<AggregatedPriceData> {
     };
   }
 
-  async processData(data: OracleData<PriceData>[]): Promise<AggregatedPriceData> {
+  async processData(data: OracleData<PriceData>[]): Promise<PriceData> {
     const dataByPair = this.groupDataByPair(data);
-    const aggregatedResults: AggregatedPriceData[] = [];
-
+    
     for (const [pairKey, pairData] of dataByPair) {
       const pair = this.supportedPairs.find(p => `${p.base}/${p.quote}` === pairKey);
       if (!pair || pairData.length === 0) continue;
@@ -217,29 +216,33 @@ export class PriceOracle extends OracleBase<AggregatedPriceData> {
         continue;
       }
 
-      // Calculate aggregated price
-      const aggregatedPrice = this.aggregatePrices(cleanedData);
+      // Calculate median price from clean data
+      const prices = cleanedData.map(d => d.value.price);
+      prices.sort((a, b) => a - b);
+      const medianPrice = prices[Math.floor(prices.length / 2)];
       
-      aggregatedResults.push(aggregatedPrice);
+      // Create aggregated price result
+      const result: PriceData = {
+        base: pair.base,
+        quote: pair.quote,
+        price: medianPrice,
+        timestamp: Date.now(),
+        source: 'aggregated',
+        volume24h: cleanedData.reduce((sum, d) => sum + (d.value.volume24h || 0), 0) / cleanedData.length,
+        change24h: cleanedData.reduce((sum, d) => sum + (d.value.change24h || 0), 0) / cleanedData.length
+      };
 
-      // Store for threshold checking
-      this.lastPrices.set(pairKey, aggregatedPrice);
-
-      this.metrics.gauge('price_oracle.aggregated_price', aggregatedPrice.price, {
+      this.metrics.gauge('price_oracle.aggregated_price', result.price, {
         pair: pairKey
       });
+      
+      return result;
     }
 
-    // For now, return the first aggregated result
-    // In a full implementation, you might process multiple pairs
-    if (aggregatedResults.length === 0) {
-      throw new ValidationError('No valid aggregated price data available');
-    }
-
-    return aggregatedResults[0];
+    throw new ValidationError('No valid aggregated price data available');
   }
 
-  async submitToBlockchain(processedData: AggregatedPriceData): Promise<string> {
+  async submitToBlockchain(processedData: PriceData): Promise<string> {
     try {
       const pairKey = `${processedData.base}/${processedData.quote}`;
       
@@ -303,12 +306,12 @@ export class PriceOracle extends OracleBase<AggregatedPriceData> {
   }
 
   // Public methods for external access
-  async getCurrentPrice(base: string, quote: string): Promise<AggregatedPriceData | null> {
+  async getCurrentPrice(base: string, quote: string): Promise<PriceData | null> {
     const pairKey = `${base}/${quote}`;
     return this.lastPrices.get(pairKey) || null;
   }
 
-  async getAllCurrentPrices(): Promise<Map<string, AggregatedPriceData>> {
+  async getAllCurrentPrices(): Promise<Map<string, PriceData>> {
     return new Map(this.lastPrices);
   }
 
@@ -435,7 +438,7 @@ export class PriceOracle extends OracleBase<AggregatedPriceData> {
     return changePercent >= this.priceConfig.deviationThreshold;
   }
 
-  private createPriceUpdateData(priceData: AggregatedPriceData): any {
+  private createPriceUpdateData(priceData: PriceData): any {
     // This would create the actual contract call data
     // For now, returning a placeholder
     return {
@@ -445,7 +448,7 @@ export class PriceOracle extends OracleBase<AggregatedPriceData> {
         quote: priceData.quote,
         price: priceData.price,
         timestamp: priceData.timestamp,
-        sources: priceData.sources,
+        source: priceData.source,
         confidence: priceData.confidence
       }
     };

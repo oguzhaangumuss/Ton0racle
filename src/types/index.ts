@@ -88,6 +88,11 @@ export class ContractError extends OracleError {
   }
 }
 
+// Import configuration types
+import { TONConfig, WalletConfig } from './blockchain';
+import { OracleConfig } from './oracle';
+import { PriceOracleConfig } from './price';
+
 // Configuration types
 export interface AppConfig {
   ton: TONConfig;

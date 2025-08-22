@@ -64,7 +64,7 @@ export abstract class DataFetcher implements PriceSource {
 
     return {
       name: this.name,
-      type: PriceSourceType.CENTRALIZED_EXCHANGE,
+      type: 'cex',
       isOnline,
       lastSuccessfulFetch: this.lastRequestTime,
       errorCount: this.errorCount,
@@ -277,11 +277,11 @@ export class BinanceFetcher extends DataFetcher {
     const symbol = `${base.toUpperCase()}${quote.toUpperCase()}`;
     
     const [priceResponse, statsResponse] = await Promise.all([
-      this.makeRequest({
+      this.makeRequest<{price: string}>({
         url: '/ticker/price',
         params: { symbol }
       }),
-      this.makeRequest({
+      this.makeRequest<{volume: string, priceChangePercent: string}>({
         url: '/ticker/24hr',
         params: { symbol }
       })
@@ -301,7 +301,7 @@ export class BinanceFetcher extends DataFetcher {
   async fetchMultiplePrices(pairs: TradingPair[]): Promise<PriceData[]> {
     const symbols = pairs.map(p => `${p.base.toUpperCase()}${p.quote.toUpperCase()}`);
     
-    const response = await this.makeRequest({
+    const response = await this.makeRequest<Array<{symbol: string, price: string}>>({
       url: '/ticker/price',
       params: { symbols: JSON.stringify(symbols) }
     });
@@ -321,7 +321,7 @@ export class BinanceFetcher extends DataFetcher {
   }
 
   async getSupportedPairs(): Promise<TradingPair[]> {
-    const response = await this.makeRequest({
+    const response = await this.makeRequest<{symbols: any[]}>({
       url: '/exchangeInfo'
     });
 
@@ -357,7 +357,7 @@ export class CoinMarketCapFetcher extends DataFetcher {
       throw new Error(`Unsupported coin: ${base}`);
     }
 
-    const response = await this.makeRequest({
+    const response = await this.makeRequest<{data: any}>({
       url: '/v1/cryptocurrency/quotes/latest',
       params: {
         id: id.toString(),

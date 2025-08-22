@@ -1,4 +1,5 @@
 import { Address, Cell, Contract } from '@ton/core';
+import { PriceHistory } from './price';
 
 export interface TONConfig {
   network: 'mainnet' | 'testnet';
